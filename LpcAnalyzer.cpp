@@ -1,6 +1,7 @@
 #include "LpcAnalyzer.h"
 #include <AnalyzerHelpers.h>
 #include <format>
+#include <fstream>
 
 // LAD[3:1], bit0 always ignored
 enum CycleType : U8 {
@@ -285,7 +286,91 @@ void LpcAnalyzerResults::GenerateBubbleText(U64 frame_index,
 
 void LpcAnalyzerResults::GenerateExportFile(const char* file,
                                             DisplayBase display_base,
-                                            U32 export_type_user_id) {}
+                                            U32 export_type_user_id) {
+  std::ofstream file_stream(file, std::ios::out);
+
+  // Attempt to merge packets of the same type with sequential addresses
+  struct MergedPacket {
+    CycleType cyctype{};
+    U32 addr{};
+    std::vector<U8> data;
+  } merged_packet;
+
+  struct LpcPacket {
+    CycleType cyctype{};
+    U32 addr{};
+    U8 data{};
+  };
+
+  auto write_packet = [&display_base,
+                       &file_stream](const MergedPacket& packet) {
+    Frame f;
+    f.mType = kCYCTYPE_DIR;
+    f.mData1 = packet.cyctype;
+    auto type_name = DescribeFrame(f, display_base);
+    f.mType = kADDR;
+    f.mData1 = packet.addr;
+    auto addr = DescribeFrame(f, display_base);
+    std::string data;
+    bool first = true;
+    for (auto d : packet.data) {
+      if (!first) {
+        data += ' ';
+      }
+      data += std::format("{:02x}", d);
+      first = false;
+    }
+    file_stream << type_name << ' ' << addr << ' ' << data << std::endl;
+  };
+
+  const U64 num_packets = GetNumPackets();
+  const U64 num_frames = GetNumFrames();
+  file_stream << "num_packets " << num_packets << std::endl;
+  file_stream << "num_frames " << num_frames << std::endl;
+  for (U64 packet_id = 0; packet_id < num_packets; packet_id++) {
+    U64 first_frame_id;
+    U64 last_frame_id;
+    GetFramesContainedInPacket(packet_id, &first_frame_id, &last_frame_id);
+
+    LpcPacket packet;
+
+    for (U64 frame_index = first_frame_id; frame_index < last_frame_id;
+         frame_index++) {
+      Frame f = GetFrame(frame_index);
+      FieldType ft = (FieldType)f.mType;
+      switch (ft) {
+      case kCYCTYPE_DIR:
+        packet.cyctype = (CycleType)f.mData1;
+        break;
+      case kADDR:
+        packet.addr = f.mData1;
+        break;
+      case kDATA:
+        packet.data = f.mData1;
+        break;
+      }
+      if (UpdateExportProgressAndCheckForCancel(frame_index, num_frames)) {
+        return;
+      }
+    }
+
+    file_stream << "packet " << (U8)packet.cyctype << std::endl;
+
+    if (merged_packet.data.size() == 0 ||
+        (merged_packet.cyctype == packet.cyctype &&
+         merged_packet.addr + merged_packet.data.size() == packet.addr)) {
+      merged_packet.data.push_back(packet.data);
+    } else {
+      write_packet(merged_packet);
+      merged_packet.cyctype = packet.cyctype;
+      merged_packet.addr = packet.addr;
+      merged_packet.data = {};
+      merged_packet.data.push_back(packet.data);
+    }
+  }
+
+  UpdateExportProgressAndCheckForCancel(num_frames, num_frames);
+}
 
 void LpcAnalyzerResults::GenerateFrameTabularText(U64 frame_index,
                                                   DisplayBase display_base) {
@@ -346,6 +431,7 @@ void LpcAnalyzer::WorkerThread() {
     results_.AddMarker(lck->GetSampleNumber(),
                        AnalyzerResults::MarkerType::Stop,
                        settings_.channels_.LFRAMEn);
+    // why doesn't this generate a packet :(
     results_.CommitPacketAndStartNewPacket();
     results_.CommitResults();
   }
