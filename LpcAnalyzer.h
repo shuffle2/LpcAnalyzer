@@ -83,6 +83,24 @@ struct LpcAnalyzerChannels {
   AnalyzerChannelData* LCLK{};
 };
 
+// The protocol encodes the expected format of successive fields in the START
+// and CYCTYPE fields. We explicitly type the frames.
+enum FieldType : U8 {
+  kSTART,
+  kCYCTYPE_DIR,
+  kSIZE,
+  kTURN_AROUND,
+  kADDR,
+  kCHANNEL,
+  kDATA,
+  kSYNC,
+};
+
+enum NibbleEndian {
+  kLSNFirst,
+  kMSNFirst,
+};
+
 class LpcAnalyzer : public Analyzer2 {
  public:
   LpcAnalyzer();
@@ -105,13 +123,45 @@ class LpcAnalyzer : public Analyzer2 {
 
   virtual void SetupResults() final;
 
+  bool AddFrame(FieldType field,
+                U64 start,
+                U64 end = 0,
+                U64 data1 = 0,
+                U64 data2 = 0,
+                U8 flags = 0);
+  template <typename T>
+  bool AddFrameSimple(FieldType field, std::optional<T> data);
+
+  bool IsAborted();
+  bool AdvanceLCKToNextEdgeIfNotAborted();
+
   std::optional<U8> NextStart();
+
   U8 SyncAndReadLAD(U64 sample_number);
+  std::optional<U8> LADRead1();
+
+  template <typename T, NibbleEndian E, size_t N>
+  std::optional<T> LADReadNibbles();
+  std::optional<U8> LADReadU8LSN() {
+    return LADReadNibbles<U8, kLSNFirst, 2>();
+  }
+  std::optional<U16> LADReadU16MSN() {
+    return LADReadNibbles<U16, kMSNFirst, 4>();
+  }
+  std::optional<U32> LADReadU32MSN() {
+    return LADReadNibbles<U32, kMSNFirst, 8>();
+  }
+
+  bool ProcessSync();
+  bool ProcessIoMemCycles(bool is_mem, bool is_write);
+  void ProcessTargetProtocol();
 
   static constexpr const char* name_{"LPC"};
   LpcAnalyzerSettings settings_;
   LpcAnalyzerResults results_;
   LpcAnalyzerChannels channels_;
+  U64 data_sample_start_{};
+  U64 next_lframe_{};
 };
 
 extern "C" {
