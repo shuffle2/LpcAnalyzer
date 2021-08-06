@@ -378,6 +378,8 @@ void LpcAnalyzerResults::GenerateFrameTabularText(U64 frame_index,
   Frame f = GetFrame(frame_index);
   std::string text = DescribeFrame(f, display_base);
   AddTabularText(text.c_str());
+  // force a newline in the "terminal" view
+  AddTabularText("");
 }
 
 // Never seems to be called :/
