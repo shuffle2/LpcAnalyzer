@@ -297,9 +297,12 @@ void LpcAnalyzerResults::GenerateExportFile(const char* file,
   } merged_packet;
 
   struct LpcPacket {
-    CycleType cyctype{};
-    U32 addr{};
-    U8 data{};
+    bool is_valid() const {
+      return cyctype.has_value() && addr.has_value() && data.has_value();
+    }
+    std::optional<CycleType> cyctype;
+    std::optional<U32> addr;
+    std::optional<U8> data;
   };
 
   auto write_packet = [&display_base,
@@ -320,53 +323,56 @@ void LpcAnalyzerResults::GenerateExportFile(const char* file,
       data += std::format("{:02x}", d);
       first = false;
     }
-    file_stream << type_name << ' ' << addr << ' ' << data << std::endl;
+    file_stream << type_name << ' ' << addr << " : " << data << std::endl;
   };
 
-  const U64 num_packets = GetNumPackets();
+  LpcPacket packet;
   const U64 num_frames = GetNumFrames();
-  file_stream << "num_packets " << num_packets << std::endl;
-  file_stream << "num_frames " << num_frames << std::endl;
-  for (U64 packet_id = 0; packet_id < num_packets; packet_id++) {
-    U64 first_frame_id;
-    U64 last_frame_id;
-    GetFramesContainedInPacket(packet_id, &first_frame_id, &last_frame_id);
-
-    LpcPacket packet;
-
-    for (U64 frame_index = first_frame_id; frame_index < last_frame_id;
-         frame_index++) {
-      Frame f = GetFrame(frame_index);
-      FieldType ft = (FieldType)f.mType;
-      switch (ft) {
-      case kCYCTYPE_DIR:
-        packet.cyctype = (CycleType)f.mData1;
-        break;
-      case kADDR:
-        packet.addr = f.mData1;
-        break;
-      case kDATA:
-        packet.data = f.mData1;
-        break;
-      }
-      if (UpdateExportProgressAndCheckForCancel(frame_index, num_frames)) {
-        return;
-      }
+  for (U64 frame_index = 0; frame_index < num_frames; frame_index++) {
+    Frame f = GetFrame(frame_index);
+    FieldType ft = (FieldType)f.mType;
+    switch (ft) {
+    case kSTART:
+      packet = {};
+      break;
+    case kCYCTYPE_DIR:
+      packet.cyctype = (CycleType)f.mData1;
+      break;
+    case kADDR:
+      packet.addr = (U32)f.mData1;
+      break;
+    case kDATA:
+      packet.data = (U8)f.mData1;
+      break;
     }
 
-    file_stream << "packet " << (U8)packet.cyctype << std::endl;
-
-    if (merged_packet.data.size() == 0 ||
-        (merged_packet.cyctype == packet.cyctype &&
-         merged_packet.addr + merged_packet.data.size() == packet.addr)) {
-      merged_packet.data.push_back(packet.data);
-    } else {
-      write_packet(merged_packet);
-      merged_packet.cyctype = packet.cyctype;
-      merged_packet.addr = packet.addr;
-      merged_packet.data = {};
-      merged_packet.data.push_back(packet.data);
+    if (packet.is_valid()) {
+      if (merged_packet.data.size() == 0) {
+        merged_packet.cyctype = packet.cyctype.value();
+        merged_packet.addr = packet.addr.value();
+        merged_packet.data.push_back(packet.data.value());
+      } else if (merged_packet.cyctype == packet.cyctype &&
+                 merged_packet.addr + merged_packet.data.size() ==
+                     packet.addr) {
+        merged_packet.data.push_back(packet.data.value());
+      } else {
+        write_packet(merged_packet);
+        merged_packet.cyctype = packet.cyctype.value();
+        merged_packet.addr = packet.addr.value();
+        merged_packet.data = {};
+        merged_packet.data.push_back(packet.data.value());
+      }
+      packet = {};
     }
+
+    if (UpdateExportProgressAndCheckForCancel(frame_index, num_frames)) {
+      return;
+    }
+  }
+
+  // catch any trailing data
+  if (merged_packet.data.size()) {
+    write_packet(merged_packet);
   }
 
   UpdateExportProgressAndCheckForCancel(num_frames, num_frames);
