@@ -1,8 +1,9 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 
 project(lpc_analyzer)
 
-set(CMAKE_CXX_STANDARD 20)
+# see https://github.com/microsoft/STL/issues/1814#issuecomment-914784312
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 
 include(AnalyzerSDK/AnalyzerSDKConfig.cmake)

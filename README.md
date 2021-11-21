@@ -9,7 +9,7 @@ using "cmake tools" extension, configure for Release build with VS - amd64 and b
 
 ### msvc / cmdline
 ```
-"c:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" amd64
+"c:\Program Files (x86)\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" amd64
 ```
 (or equivalent for your installation / start environment from appropriate start menu entry)
 
