@@ -8,6 +8,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED YES)
 
 include(AnalyzerSDK/AnalyzerSDKConfig.cmake)
 
+# sanity checks
+if(NOT ("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8"))
+    message(FATAL_ERROR "only 64bit build supported")
+endif()
+if(NOT ("${CMAKE_BUILD_TYPE}" STREQUAL "Release"))
+    message(NOTICE "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
+endif()
+
 # taken from saleae example code...can probably be improved/simplified
 function(add_analyzer_plugin TARGET)
     set(options )

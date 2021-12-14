@@ -15,7 +15,7 @@ using "cmake tools" extension, configure for Release build with VS - amd64 and b
 
 ```
 mkdir build && cd build
-cmake .. -GNinja && ninja
+cmake -GNinja -DCMAKE_BUILD_TYPE=Release .. && ninja
 ```
 
 ## usage
