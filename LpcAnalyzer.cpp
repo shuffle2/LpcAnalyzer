@@ -604,9 +604,7 @@ bool LpcAnalyzer::ProcessSync() {
   // them?) a final value is driven (Ready, ReadyMore, Error) and the slave
   // stops driving. The master drives the bus afterwards for 1 clock.
   // Technically ReadyMore is only valid for DMA.
-  bool ready = false;
   while (true) {
-    bool is_last = ready;
     auto sync = LADRead1();
     if (!sync.has_value()) {
       // aborted during SYNC
@@ -614,9 +612,6 @@ bool LpcAnalyzer::ProcessSync() {
     }
     AddFrame(kSYNC, lck->GetSampleNumber(), 0, sync.value());
     if (sync == kReady || sync == kReadyMore || sync == kError) {
-      ready = true;
-    }
-    if (is_last) {
       break;
     }
   }
