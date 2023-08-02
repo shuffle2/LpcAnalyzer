@@ -207,7 +207,7 @@ std::string DisplayBaseToSpecifier(DisplayBase display_base) {
 std::string DescribeADDR(const Frame& frame, DisplayBase display_base) {
   auto fmt =
       std::string("ADDR:{:") + DisplayBaseToSpecifier(display_base) + "}";
-  return std::format(fmt, (U32)frame.mData1);
+  return std::vformat(fmt, std::make_format_args((U32)frame.mData1));
 }
 std::string DescribeCHANNEL(const Frame& frame) {
   return std::format("CHANNEL:{:b}", (U8)frame.mData1);
@@ -215,7 +215,7 @@ std::string DescribeCHANNEL(const Frame& frame) {
 std::string DescribeDATA(const Frame& frame, DisplayBase display_base) {
   auto fmt =
       std::string("DATA:{:") + DisplayBaseToSpecifier(display_base) + "}";
-  return std::format(fmt, (U32)frame.mData1);
+  return std::vformat(fmt, std::make_format_args((U32)frame.mData1));
 }
 std::string DescribeSYNC(const Frame& frame) {
   auto sync = (SyncCode)frame.mData1;
