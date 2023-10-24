@@ -1,6 +1,8 @@
 #include "LpcAnalyzer.h"
 #include <AnalyzerHelpers.h>
-#include <format>
+#include <iomanip>
+#include <bitset>
+#include <sstream>
 #include <fstream>
 
 // LAD[3:1], bit0 always ignored
@@ -32,16 +34,17 @@ enum SyncCode : U8 {
 
 LpcAnalyzerSettings::LpcAnalyzerSettings() {
   ClearChannels();
+  char name[10];
 
   for (size_t i = 0; i < ui_channels_.LAD.size(); i++) {
     auto& ui = ui_channels_.LAD[i];
     auto& c = channels_.LAD[i];
-    auto name = std::format("LAD[{}]", i);
-    ui.SetTitleAndTooltip(name.c_str(),
+    snprintf(name, 10, "LAD[%ld]", i);
+    ui.SetTitleAndTooltip(name,
                           "Multiplexed Command, Address, and Data");
     ui.SetChannel(channels_.LAD[i]);
     AddInterface(&ui);
-    AddChannel(c, name.c_str(), false);
+    AddChannel(c, name, false);
   }
 
   ui_channels_.LFRAMEn.SetTitleAndTooltip(
@@ -77,10 +80,11 @@ bool LpcAnalyzerSettings::SetSettingsFromInterfaces() {
   channels_.LCLK = ui_channels_.LCLK.GetChannel();
 
   ClearChannels();
+  char name[10];
   for (size_t i = 0; i < channels_.LAD.size(); i++) {
     auto& c = channels_.LAD[i];
-    auto name = std::format("LAD[{}]", i);
-    AddChannel(c, name.c_str(), c != UNDEFINED_CHANNEL);
+    snprintf(name, 10, "LAD[%ld]", i);
+    AddChannel(c, name, c != UNDEFINED_CHANNEL);
   }
   AddChannel(channels_.LFRAMEn, "LFRAME",
              channels_.LFRAMEn != UNDEFINED_CHANNEL);
@@ -95,10 +99,11 @@ void LpcAnalyzerSettings::LoadSettings(const char* settings) {
   archive >> channels_;
 
   ClearChannels();
+  char name [10];
   for (size_t i = 0; i < channels_.LAD.size(); i++) {
     auto& c = channels_.LAD[i];
-    auto name = std::format("LAD[{}]", i);
-    AddChannel(c, name.c_str(), c != UNDEFINED_CHANNEL);
+    snprintf(name, 10, "LAD[%ld]", i);
+    AddChannel(c, name, c != UNDEFINED_CHANNEL);
   }
   AddChannel(channels_.LFRAMEn, "LFRAME",
              channels_.LFRAMEn != UNDEFINED_CHANNEL);
@@ -135,7 +140,8 @@ std::string DescribeSTART(const Frame& frame) {
     desc = "Stop";
     break;
   default:
-    desc = std::format("START:{:b}", (U8)start);
+    desc = "START:";
+    desc.insert(6, std::bitset<8>(start).to_string());
     break;
   }
   return desc;
@@ -163,7 +169,8 @@ std::string DescribeCYCTYPE_DIR(const Frame& frame) {
     desc = "DMA Write";
     break;
   default:
-    desc = std::format("CYCTYPE_DIR:{:b}", (U8)cyctype_dir);
+    desc = "CYCTYPE_DIR:";
+    desc.insert(12, std::bitset<8>(cyctype_dir).to_string());
     break;
   }
   return desc;
@@ -182,7 +189,8 @@ std::string DescribeSIZE(const Frame& frame) {
     desc = "4B";
     break;
   default:
-    desc = std::format("SIZE:{:b}", size);
+    desc = "SIZE:";
+    desc.insert(5, std::bitset<8>(size).to_string());
     break;
   }
   return desc;
@@ -191,8 +199,13 @@ std::string DescribeTURN_AROUND(const Frame& frame) {
   if (frame.mData1 == 0xff) {
     return "TAR";
   }
-  return std::format("TAR:{:b}", (U8)frame.mData1);
+  std::string data;
+  data = "TAR:";
+  data.insert(4, std::bitset<8>(frame.mData1).to_string());
+  return data;
 }
+#if 0
+// This function is no longer used!
 std::string DisplayBaseToSpecifier(DisplayBase display_base) {
   switch (display_base) {
   case Binary:
@@ -204,18 +217,48 @@ std::string DisplayBaseToSpecifier(DisplayBase display_base) {
     return "x";
   }
 }
+#endif
 std::string DescribeADDR(const Frame& frame, DisplayBase display_base) {
-  auto fmt =
-      std::string("ADDR:{:") + DisplayBaseToSpecifier(display_base) + "}";
-  return std::vformat(fmt, std::make_format_args((U32)frame.mData1));
+  std::string text;
+  text = "ADDR:";
+  std::stringstream stream;
+  switch (display_base) {
+  case Binary:
+	 stream << std::bitset<16>(frame.mData1);
+	 break;
+  case Decimal:
+	 stream << static_cast<int>(frame.mData1);
+	 break;
+  case Hexadecimal:
+	 stream << std::hex << frame.mData1;
+	 break;
+  }
+  text.insert(5, stream.str());
+  return text;
 }
 std::string DescribeCHANNEL(const Frame& frame) {
-  return std::format("CHANNEL:{:b}", (U8)frame.mData1);
+  std::string data;
+  data = "CHANNEL:";
+  data.insert(9, std::bitset<8>(frame.mData1).to_string());
+  return data;
 }
 std::string DescribeDATA(const Frame& frame, DisplayBase display_base) {
-  auto fmt =
-      std::string("DATA:{:") + DisplayBaseToSpecifier(display_base) + "}";
-  return std::vformat(fmt, std::make_format_args((U32)frame.mData1));
+  std::string text;
+  text = "DATA:";
+  std::stringstream stream;
+  switch (display_base) {
+  case Binary:
+	stream << std::bitset<8>(frame.mData1);
+	break;
+  case Decimal:
+	stream << static_cast<int>(frame.mData1);
+	break;
+  case Hexadecimal:
+	stream << std::hex << frame.mData1;
+	break;
+  }
+  text.insert(5, stream.str());
+  return text;
 }
 std::string DescribeSYNC(const Frame& frame) {
   auto sync = (SyncCode)frame.mData1;
@@ -237,7 +280,8 @@ std::string DescribeSYNC(const Frame& frame) {
     desc = "Error";
     break;
   default:
-    desc = std::format("SYNC:{:b}", (U8)sync);
+    desc = "SYNC:";
+    desc.insert(5, std::bitset<4>(sync).to_string());
     break;
   }
   return desc;
@@ -314,16 +358,16 @@ void LpcAnalyzerResults::GenerateExportFile(const char* file,
     f.mType = kADDR;
     f.mData1 = packet.addr;
     auto addr = DescribeFrame(f, display_base);
-    std::string data;
+    std::stringstream data;
     bool first = true;
     for (auto d : packet.data) {
       if (!first) {
-        data += ' ';
+	data << ' ';
       }
-      data += std::format("{:02x}", d);
+      data << "0x" << std::uppercase << std::setfill('0') << std::setw(2) << std::hex << static_cast<int> (d);
       first = false;
     }
-    file_stream << type_name << ' ' << addr << " : " << data << std::endl;
+    file_stream << type_name << ' ' << addr << " : " << data.str() << std::endl;
   };
 
   LpcPacket packet;
