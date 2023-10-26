@@ -17,6 +17,13 @@ using "cmake tools" extension, configure for Release build with VS - amd64 and b
 mkdir build && cd build
 cmake -GNinja -DCMAKE_BUILD_TYPE=Release .. && ninja
 ```
+### linux build
+```
+mkdir build
+cd build
+cmake ..
+cmake --build .
+```
 
 ## usage
 add the path containing the dll to Logic (Preferences -> Custom Low Level Analyzers), or copy dll to existing setup path.
