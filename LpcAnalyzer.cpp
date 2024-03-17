@@ -17,6 +17,7 @@ enum StartCode : U8 {
   kStart = 0b0000,
   kBusMasterGrant0 = 0b0010,
   kBusMasterGrant1 = 0b0011,
+  kTpmStart = 0b0101,
   kFwRead = 0b1101,
   kFwWrite = 0b1110,
   kStop = 0b1111,
@@ -124,6 +125,9 @@ std::string DescribeSTART(const Frame& frame) {
   switch (start) {
   case kStart:
     desc = "Start";
+    break;
+  case kTpmStart:
+    desc = "TPM";
     break;
   case kFwRead:
     desc = "FW Read";
@@ -426,6 +430,7 @@ void LpcAnalyzer::WorkerThread() {
 
     switch (start.value()) {
     case kStart:
+    case kTpmStart:
       ProcessTargetProtocol();
       break;
     case kStop:
